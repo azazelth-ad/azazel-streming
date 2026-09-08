@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Azazel Streaming</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #121212; color: #ffffff; padding: 20px; text-align: center; }
+        .container { max-width: 600px; margin: 0 auto; background: #1e1e1e; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        h1 { margin-bottom: 20px; color: #1db954; }
+        .auth-section, .app-section { margin-bottom: 20px; }
+        input[type="text"], input[type="url"], input[type="email"], input[type="password"] {
+            width: 100%; padding: 10px; margin: 8px 0; border-radius: 6px; border: 1px solid #333; background: #2a2a2a; color: white;
+        }
+        button {
+            width: 100%; padding: 12px; background-color: #1db954; border: none; color: white;
+            font-weight: bold; border-radius: 20px; cursor: pointer; margin-top: 10px; transition: 0.2s;
+        }
+        button:hover { background-color: #1ed760; }
+        .hidden { display: none; }
+        .media-item { background: #282828; margin: 15px 0; padding: 15px; border-radius: 8px; text-align: left; }
+        audio, video { width: 100%; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Azazel Streaming</h1>
+
+        <!-- ส่วนล็อกอิน / สมัครสมาชิก -->
+        <div id="auth-section" class="auth-section">
+            <h2>เข้าสู่ระบบ / สมัครสมาชิก</h2>
+            <input type="email" id="email" placeholder="อีเมล">
+            <input type="password" id="password" placeholder="รหัสผ่าน">
+            <button onclick="login()">เข้าสู่ระบบ</button>
+            <button onclick="register()" style="background-color: #333;">สมัครสมาชิก</button>
+        </div>
+
+        <!-- ส่วนสตรีมมิ่ง & เพิ่มเพลง -->
+        <div id="app-section" class="app-section hidden">
+            <p>ยินดีต้อนรับ, <span id="user-email"></span> | <a href="#" onclick="logout()" style="color: #1db954;">ออกจากระบบ</a></p>
+            
+            <hr style="border-color: #333; margin: 20px 0;">
+
+            <h3>เพิ่มเพลง / สื่อใหม่</h3>
+            <input type="text" id="media-title" placeholder="ชื่อเพลง / สื่อ">
+            <input type="url" id="media-url" placeholder="วางลิงก์ไฟล์เสียง (เช่น MP3 URL)">
+            <button onclick="addMedia()">เพิ่มเข้าเพลย์ลิสต์</button>
+
+            <hr style="border-color: #333; margin: 20px 0;">
+
+            <h3>รายการสื่อทั้งหมด</h3>
+            <div id="media-list"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // Firebase Configuration ของคุณ azazel-th
+        const firebaseConfig = {
+          apiKey: "AIzaSyDk2QZh_xA-AfCk9vs1t8gKUaXqK1b9DQ4",
+          authDomain: "azazel-th.firebaseapp.com",
+          projectId: "azazel-th",
+          storageBucket: "azazel-th.firebasestorage.app",
+          messagingSenderId: "910701725182",
+          appId: "1:910701725182:web:63b98cffee1688ddc12caf",
+          measurementId: "G-ZEVWPTNNJG"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // ตรวจสอบสถานะการล็อกอิน
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                document.getElementById('auth-section').classList.add('hidden');
+                document.getElementById('app-section').classList.remove('hidden');
+                document.getElementById('user-email').innerText = user.email;
+                loadMedia();
+            } else {
+                document.getElementById('auth-section').classList.remove('hidden');
+                document.getElementById('app-section').classList.add('hidden');
+            }
+        });
+
+        // ฟังก์ชันสมัครสมาชิก
+        window.register = () => {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            if(!email || !password) return alert('กรุณากรอกอีเมลและรหัสผ่าน');
+            createUserWithEmailAndPassword(auth, email, password)
+                .then(() => alert('สมัครสมาชิกสำเร็จ!'))
+                .catch(err => alert('เกิดข้อผิดพลาด: ' + err.message));
+        };
+
+        // ฟังก์ชันล็อกอิน
+        window.login = () => {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            if(!email || !password) return alert('กรุณากรอกอีเมลและรหัสผ่าน');
+            signInWithEmailAndPassword(auth, email, password)
+                .catch(err => alert('เข้าสู่ระบบไม่สำเร็จ: ' + err.message));
+        };
+
+        // ฟังก์ชันออกจากระบบ
+        window.logout = () => signOut(auth);
+
+        // ฟังก์ชันเพิ่มสื่อ
+        window.addMedia = async () => {
+            const title = document.getElementById('media-title').value;
+            const url = document.getElementById('media-url').value;
+
+            if (!title || !url) return alert('กรุณากรอกชื่อและลิงก์สื่อ');
+
+            try {
+                await addDoc(collection(db, "media"), {
+                    title: title,
+                    url: url,
+                    createdAt: new Date()
+                });
+                document.getElementById('media-title').value = '';
+                document.getElementById('media-url').value = '';
+            } catch (err) {
+                alert("เกิดข้อผิดพลาดในการบันทึก: " + err.message);
+            }
+        };
+
+        // ฟังก์ชันดึงรายการสื่อแสดงผล Real-time
+        function loadMedia() {
+            const q = query(collection(db, "media"), orderBy("createdAt", "desc"));
+            onSnapshot(q, (snapshot) => {
+                const mediaList = document.getElementById('media-list');
+                mediaList.innerHTML = '';
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const item = document.createElement('div');
+                    item.className = 'media-item';
+                    item.innerHTML = `<h4>${data.title}</h4><audio controls src="${data.url}"></audio>`;
+                    mediaList.appendChild(item);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
